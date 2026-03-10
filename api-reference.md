@@ -10,11 +10,17 @@ interface HttpResponse<T> {
 	message: string | null;
 	success: boolean;
 	info?: ApiResponseInfo;
+	pagination?: PaginationInfo;
 }
 
 interface ApiResponseInfo {
 	version: string;
 	credits_consumed: number;
+}
+
+interface PaginationInfo {
+	has_more: boolean;
+	pagination_key: string | number | null;
 }
 ```
 
@@ -22,7 +28,7 @@ interface ApiResponseInfo {
 
 ```typescript
 client.markets.getMarkets(params?, venue?)
-// params: { limit?, offset?, sort_by?, sort_order?, status?, tag?, search? }
+// params: { limit?, pagination_key?, sort_by?, ascending? }
 // returns: HttpResponse<MarketMetadata[]>
 
 client.markets.getMarket({ conditionId }, venue?)
@@ -31,11 +37,14 @@ client.markets.getMarket({ conditionId }, venue?)
 client.markets.getMarketBySlug({ slug }, venue?)
 // returns: HttpResponse<MarketMetadata>
 
+client.markets.getMarketChart({ conditionId, ...query }, venue?)
+// returns: HttpResponse<PositionChartOutcome[]>
+
 client.markets.getMarketMetrics({ conditionId, ...query }, venue?)
 // returns: HttpResponse<ConditionMetricsResponse>
 
 client.markets.getTrades(params?, venue?)
-// params: { conditionId?, limit?, offset?, trader?, side? }
+// params: { conditionId?, limit?, pagination_key? }
 // returns: HttpResponse<Trade[]>
 
 client.markets.getCandlestick({ conditionId, interval, ...query }, venue?)
@@ -53,59 +62,60 @@ client.markets.getMarketVolumeChart({ conditionId, ...query }, venue?)
 
 client.markets.getPositionVolumeChart({ positionId, ...query }, venue?)
 // returns: HttpResponse<PositionVolumeChartResponse>
+
+client.markets.getPriceJumps(params?, venue?)
+// returns: HttpResponse<PriceJump[]>
 ```
 
 ## Events Namespace
 
 ```typescript
 client.events.getEvents(params?, venue?)
-// params: { limit?, offset?, sort_by?, sort_order?, status?, tag?, search? }
+// params: { limit?, pagination_key?, sort_by?, ascending? }
 // returns: HttpResponse<Event[]>
 
-client.events.getEvent({ id, include_tags?, include_markets? }, venue?)
+client.events.getEvent({ identifier, ...query }, venue?)
 // returns: HttpResponse<Event>
 
-client.events.getEventBySlug({ slug, include_tags?, include_markets? }, venue?)
+client.events.getEventBySlug({ slug, ...query }, venue?)
 // returns: HttpResponse<Event>
+
+client.events.getEventChart({ eventId, ...query }, venue?)
+// returns: HttpResponse<EventMarketChartOutcome[]>
 
 client.events.getEventMetrics({ eventId, ...query }, venue?)
 // returns: HttpResponse<EventMetricsResponse>
+
+client.events.getEventOutcomes({ eventId, ...query }, venue?)
+// returns: HttpResponse<Record<string, string>>
 ```
 
 ## Trader Namespace
 
 ```typescript
-client.trader.getPortfolio({ address, timeframe? }, venue?)
-// timeframe: "7d" | "30d" | "lifetime"
-// returns: HttpResponse<Portfolio>
-
-client.trader.getPortfolioPositions({ address, limit?, offset?, ...query }, venue?)
-// returns: HttpResponse<PositionsResponse>
-
-client.trader.getTraderTrades({ address, limit?, offset?, ...query }, venue?)
-// returns: HttpResponse<TradesResponse>
+client.trader.getTraderTrades({ address, ...query }, venue?)
+// returns: HttpResponse<Trade[]>
 
 client.trader.getTraderProfile({ address }, venue?)
 // returns: HttpResponse<UserProfile>
 
 client.trader.getTraderProfilesBatch({ addresses }, venue?)
 // addresses: comma-separated string of wallet addresses
-// returns: HttpResponse<Record<string, UserProfile>>
+// returns: HttpResponse<UserProfile[]>
 
 client.trader.getTraderVolumeChart({ address, ...query }, venue?)
 // returns: HttpResponse<TraderVolumeChartResponse>
 
-client.trader.getTraderPnl({ address, timeframe? }, venue?)
-// timeframe: "7d" | "30d" | "lifetime"
-// returns: HttpResponse<TraderPnlSummary>
+client.trader.getTraderPnl({ address, ...query }, venue?)
+// returns: HttpResponse<GlobalPnlTrader>
 
-client.trader.getTraderPositionPnl({ address, timeframe?, sort_by?, sort_direction?, limit?, pagination_key?, condition_id?, event_slug? }, venue?)
-// returns: HttpResponse<PnlListResponse<TraderPositionPnlEntry>>
+client.trader.getTraderOutcomePnl({ address, ...query }, venue?)
+// returns: HttpResponse<TraderOutcomePnlEntry[]>
 
-client.trader.getTraderMarketPnl({ address, timeframe?, sort_by?, sort_direction?, limit?, pagination_key?, condition_id?, event_slug? }, venue?)
+client.trader.getTraderMarketPnl({ address, ...query }, venue?)
 // returns: HttpResponse<PnlListResponse<TraderMarketPnlEntry>>
 
-client.trader.getTraderEventPnl({ address, timeframe?, sort_by?, sort_direction?, limit?, pagination_key?, condition_id?, event_slug? }, venue?)
+client.trader.getTraderEventPnl({ address, ...query }, venue?)
 // returns: HttpResponse<PnlListResponse<TraderEventPnlEntry>>
 
 client.trader.getTraderPnlCandles({ address, resolution?, start_ts?, end_ts?, limit? }, venue?)
@@ -113,7 +123,7 @@ client.trader.getTraderPnlCandles({ address, resolution?, start_ts?, end_ts?, li
 // returns: HttpResponse<PnlCandlesResponse>
 
 client.trader.getGlobalPnl(params?, venue?)
-// returns: HttpResponse<GlobalPnlResponse>
+// returns: HttpResponse<GlobalPnlTrader[]>
 ```
 
 ## Holders Namespace
@@ -122,36 +132,14 @@ client.trader.getGlobalPnl(params?, venue?)
 client.holders.getMarketHolders({ conditionId, ...query }, venue?)
 // returns: HttpResponse<MarketHoldersResponse>
 
-client.holders.getEventHolders({ eventSlug, ...query }, venue?)
-// returns: HttpResponse<EventHoldersResponse>
-
 client.holders.getPositionHolders({ positionId, ...query }, venue?)
 // returns: HttpResponse<PositionHoldersResponse>
 
-client.holders.getMarketHoldersHistory({ conditionId, hours? }, venue?)
+client.holders.getMarketHoldersHistory({ conditionId, ...query }, venue?)
 // returns: HttpResponse<HolderHistoryCandle[]>
 
-client.holders.getEventHoldersHistory({ eventSlug, hours? }, venue?)
+client.holders.getPositionHoldersHistory({ positionId, ...query }, venue?)
 // returns: HttpResponse<HolderHistoryCandle[]>
-
-client.holders.getPositionHoldersHistory({ positionId, hours? }, venue?)
-// returns: HttpResponse<HolderHistoryCandle[]>
-```
-
-## Scoring Namespace
-
-```typescript
-client.scoring.getTraderScore({ address }, venue?)
-// returns: HttpResponse<TraderScore>
-
-client.scoring.getSmartMoneyLeaderboard({ limit? }, venue?)
-// returns: HttpResponse<SmartMoneyEntry[]>
-
-client.scoring.getInsiderLeaderboard({ limit? }, venue?)
-// returns: HttpResponse<InsiderEntry[]>
-
-client.scoring.getBots({ limit? }, venue?)
-// returns: HttpResponse<BotEntry[]>
 ```
 
 ## Series Namespace
@@ -160,12 +148,8 @@ client.scoring.getBots({ limit? }, venue?)
 client.series.getSeriesList(params?, venue?)
 // returns: HttpResponse<Series[]>
 
-client.series.getSeriesDetail({ identifier, ...query }, venue?)
-// identifier: series ID or slug
-// returns: HttpResponse<SeriesDetail>
-
-client.series.getSeriesEvents({ identifier, ...query }, venue?)
-// returns: HttpResponse<Event[]>
+client.series.getSeriesOutcomes({ seriesId, ...query }, venue?)
+// returns: HttpResponse<Record<string, string>>
 ```
 
 ## Search Namespace
@@ -192,13 +176,50 @@ client.bonds.getBonds(params?, venue?)
 // returns: HttpResponse<BondMarket[]>
 ```
 
+## Assets Namespace
+
+```typescript
+client.assets.getAssetHistory({ asset, interval, ...query }, venue?)
+// returns: HttpResponse<AssetPriceHistoryRow[]>
+```
+
+## Webhooks Namespace
+
+Platform-level (not venue-scoped):
+
+```typescript
+client.webhooks.list(params?)
+// returns: HttpResponse<WebhookListResponseBody>
+
+client.webhooks.create({ url, events, ...body })
+// returns: HttpResponse<WebhookResponse>
+
+client.webhooks.getWebhook({ webhookId })
+// returns: HttpResponse<WebhookResponse>
+
+client.webhooks.update({ webhookId, ...body })
+// returns: HttpResponse<WebhookResponse>
+
+client.webhooks.deleteWebhook({ webhookId })
+// returns: HttpResponse<DeleteWebhookResponse>
+
+client.webhooks.test({ webhookId })
+// returns: HttpResponse<WebhookTestResponseBody>
+
+client.webhooks.rotateSecret({ webhookId })
+// returns: HttpResponse<RotateSecretResponse>
+
+client.webhooks.listEvents()
+// returns: HttpResponse<ListEventsResponse>
+```
+
 ## Venue Override
 
 Every method accepts an optional `venue` parameter as the last argument:
 
 ```typescript
 const markets = await client.markets.getMarkets();
-const kalshiMarkets = await client.markets.getMarkets({}, "kalshi");
+const polymarketMarkets = await client.markets.getMarkets({}, "polymarket");
 ```
 
 ## Error Classes
@@ -209,7 +230,5 @@ import {
 	HttpError, // HTTP 4xx/5xx — has .status, .statusText, .body, .responseHeaders
 	NetworkError, // Connection failed
 	TimeoutError, // Request timeout — has .timeout
-	WebSocketError, // WebSocket error
-	WebSocketClosedError, // WebSocket closed — has .code, .reason
 } from "@structbuild/sdk";
 ```

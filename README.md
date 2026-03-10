@@ -4,29 +4,16 @@ An agent skill for integrating [@structbuild/sdk](https://www.npmjs.com/package/
 
 ## Installation
 
-### Via npx (skills.sh)
-
 ```bash
-npx skills install struct-sdk-skill
-```
-
-### Manual Installation
-
-Clone to your skills directory:
-
-```bash
-# Personal (all projects)
-git clone https://github.com/structbuild/struct-sdk-skill ~/.cursor/skills/struct-sdk
-
-# Project-specific
-git clone https://github.com/structbuild/struct-sdk-skill .cursor/skills/struct-sdk
+npx skills add structbuild/struct-skill
 ```
 
 ## What This Skill Provides
 
 This skill helps AI agents integrate the Struct SDK into your projects:
 
-- **REST API integration** - Markets, events, traders, holders, scoring, series, search, tags, bonds
+- **REST API integration** - Markets, events, traders, holders, series, search, tags, bonds, assets
+- **Webhook management** - Create and manage webhooks for event notifications
 - **Pagination helpers** - Iterate through large datasets
 - **Error handling** - Typed errors for robust applications
 - **TypeScript types** - Full type safety from OpenAPI spec
@@ -35,8 +22,10 @@ This skill helps AI agents integrate the Struct SDK into your projects:
 
 | File               | Description                                          |
 | ------------------ | ---------------------------------------------------- |
-| `SKILL.md`         | Main skill file with quick start and common patterns |
-| `api-reference.md` | Complete method reference for all namespaces         |
+| `SKILL.md`         | Main skill file with quick start and common patterns  |
+| `api-reference.md` | Complete method reference for all namespaces           |
+| `webhooks.md`      | Webhook events, filters, payload format, and examples |
+| `guides.md`        | Market screening, trader analytics, and more          |
 
 ## When the Agent Uses This Skill
 

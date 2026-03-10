@@ -35,11 +35,11 @@ const client = new StructClient({
 	apiKey: "your-api-key",
 	venue: "polymarket",
 	baseUrl: "https://api.struct.to/v1",
-	timeout: 10000,
+	timeout: 30000,
 	headers: { "x-custom": "value" },
 	retry: {
 		maxRetries: 3,
-		initialDelayMs: 500,
+		initialDelayMs: 1000,
 		maxDelayMs: 30000,
 	},
 	onRequest: (info) => console.log(`${info.method} ${info.url}`),
@@ -60,24 +60,29 @@ interface HttpResponse<T> {
 		version: string;
 		credits_consumed: number;
 	};
+	pagination?: {
+		has_more: boolean;
+		pagination_key: string | number | null;
+	};
 }
 ```
 
 ## API Namespaces
 
-The client exposes 9 namespaces. Every method accepts an optional `venue` parameter as its last argument.
+The client exposes 10 namespaces. Every method accepts an optional `venue` parameter as its last argument.
 
-| Namespace | Purpose                                                           |
-| --------- | ----------------------------------------------------------------- |
-| `markets` | Market data, trades, candlesticks, metrics, volume charts         |
-| `events`  | Event listings and metrics                                        |
-| `trader`  | Portfolio, positions, PnL, profiles, trade history, volume charts |
-| `holders` | Market/event/position holders and holder history                  |
-| `series`  | Market series listings and details                                |
-| `search`  | Search markets and events                                         |
-| `scoring` | Trader scores, smart money / insider / bot leaderboards           |
-| `tags`    | Tag listings and lookup                                           |
-| `bonds`   | Bond market data                                                  |
+| Namespace  | Purpose                                                           |
+| ---------- | ----------------------------------------------------------------- |
+| `markets`  | Market data, trades, candlesticks, metrics, volume charts         |
+| `events`   | Event listings, charts, metrics, outcomes                         |
+| `trader`   | PnL, profiles, trade history, volume charts                       |
+| `holders`  | Market/position holders and holder history                        |
+| `series`   | Market series listings and outcomes                               |
+| `search`   | Search markets and events                                         |
+| `tags`     | Tag listings and lookup                                           |
+| `bonds`    | Bond market data                                                  |
+| `assets`   | Asset price history                                               |
+| `webhooks` | Webhook management (create, update, delete, test)                 |
 
 ## Markets
 
@@ -85,6 +90,7 @@ The client exposes 9 namespaces. Every method accepts an optional `venue` parame
 const markets = await client.markets.getMarkets({ limit: 10, sort_by: "volume" });
 const market = await client.markets.getMarket({ conditionId: "0x..." });
 const marketBySlug = await client.markets.getMarketBySlug({ slug: "will-x-happen" });
+const chart = await client.markets.getMarketChart({ conditionId: "0x..." });
 
 const trades = await client.markets.getTrades({ conditionId: "0x...", limit: 50 });
 const candles = await client.markets.getCandlestick({ conditionId: "0x...", interval: "1h" });
@@ -95,35 +101,31 @@ const posMetrics = await client.markets.getPositionMetrics({ positionId: "pos_12
 
 const marketVolume = await client.markets.getMarketVolumeChart({ conditionId: "0x..." });
 const posVolume = await client.markets.getPositionVolumeChart({ positionId: "pos_123" });
+
+const priceJumps = await client.markets.getPriceJumps({ limit: 20 });
 ```
 
 ## Events
 
 ```typescript
 const events = await client.events.getEvents({ limit: 10 });
-const event = await client.events.getEvent({ id: "123", include_tags: true, include_markets: true });
-const eventBySlug = await client.events.getEventBySlug({ slug: "us-election", include_markets: true });
-const eventMetrics = await client.events.getEventMetrics({ eventId: "123" });
+const event = await client.events.getEvent({ identifier: "123" });
+const eventBySlug = await client.events.getEventBySlug({ slug: "us-election" });
+const chart = await client.events.getEventChart({ eventId: "123" });
+const metrics = await client.events.getEventMetrics({ eventId: "123" });
+const outcomes = await client.events.getEventOutcomes({ eventId: "123" });
 ```
 
 ## Trader
 
 ```typescript
-const portfolio = await client.trader.getPortfolio({ address: "0x...", timeframe: "30d" });
-const positions = await client.trader.getPortfolioPositions({ address: "0x...", limit: 50 });
 const trades = await client.trader.getTraderTrades({ address: "0x...", limit: 50 });
 
 const profile = await client.trader.getTraderProfile({ address: "0x..." });
 const profiles = await client.trader.getTraderProfilesBatch({ addresses: "0xabc,0xdef" });
 
-const pnl = await client.trader.getTraderPnl({ address: "0x...", timeframe: "30d" });
-const positionPnl = await client.trader.getTraderPositionPnl({
-	address: "0x...",
-	timeframe: "30d",
-	sort_by: "pnl_usd",
-	sort_direction: "desc",
-	limit: 20,
-});
+const pnl = await client.trader.getTraderPnl({ address: "0x..." });
+const outcomePnl = await client.trader.getTraderOutcomePnl({ address: "0x..." });
 const marketPnl = await client.trader.getTraderMarketPnl({ address: "0x..." });
 const eventPnl = await client.trader.getTraderEventPnl({ address: "0x..." });
 const pnlCandles = await client.trader.getTraderPnlCandles({
@@ -140,29 +142,17 @@ const globalPnl = await client.trader.getGlobalPnl({ limit: 100 });
 
 ```typescript
 const marketHolders = await client.holders.getMarketHolders({ conditionId: "0x..." });
-const eventHolders = await client.holders.getEventHolders({ eventSlug: "us-election" });
 const positionHolders = await client.holders.getPositionHolders({ positionId: "pos_123" });
 
-const marketHistory = await client.holders.getMarketHoldersHistory({ conditionId: "0x...", hours: 24 });
-const eventHistory = await client.holders.getEventHoldersHistory({ eventSlug: "us-election", hours: 48 });
+const marketHistory = await client.holders.getMarketHoldersHistory({ conditionId: "0x..." });
 const positionHistory = await client.holders.getPositionHoldersHistory({ positionId: "pos_123" });
-```
-
-## Scoring
-
-```typescript
-const score = await client.scoring.getTraderScore({ address: "0x..." });
-const smartMoney = await client.scoring.getSmartMoneyLeaderboard({ limit: 50 });
-const insiders = await client.scoring.getInsiderLeaderboard({ limit: 50 });
-const bots = await client.scoring.getBots({ limit: 50 });
 ```
 
 ## Series
 
 ```typescript
 const allSeries = await client.series.getSeriesList();
-const detail = await client.series.getSeriesDetail({ identifier: "series-slug" });
-const seriesEvents = await client.series.getSeriesEvents({ identifier: "series-slug" });
+const outcomes = await client.series.getSeriesOutcomes({ seriesId: "series-id" });
 ```
 
 ## Search
@@ -182,6 +172,28 @@ const tag = await client.tags.getTag({ identifier: "politics" });
 
 ```typescript
 const bonds = await client.bonds.getBonds({ limit: 50 });
+```
+
+## Assets
+
+```typescript
+const history = await client.assets.getAssetHistory({ asset: "BTC", interval: "1d" });
+```
+
+## Webhooks
+
+```typescript
+const webhooks = await client.webhooks.list();
+const webhook = await client.webhooks.create({
+	url: "https://example.com/webhook",
+	events: ["market_trade"],
+});
+const detail = await client.webhooks.getWebhook({ webhookId: "wh_123" });
+await client.webhooks.update({ webhookId: "wh_123", url: "https://example.com/new" });
+await client.webhooks.deleteWebhook({ webhookId: "wh_123" });
+await client.webhooks.test({ webhookId: "wh_123" });
+await client.webhooks.rotateSecret({ webhookId: "wh_123" });
+const events = await client.webhooks.listEvents();
 ```
 
 ## Pagination
@@ -217,3 +229,5 @@ try {
 ## Additional Resources
 
 - [API Reference](api-reference.md) - Complete method reference
+- [Webhooks](webhooks.md) - Events, filters, payload format, and examples
+- [Guides](guides.md) - Market screening, trader analytics, and more
