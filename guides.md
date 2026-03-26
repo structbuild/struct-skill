@@ -92,6 +92,28 @@ const candles = await client.trader.getTraderPnlCandles({
 });
 ```
 
+## Trader Portfolio Composition
+
+There is no single portfolio endpoint. Compose a full trader view from parallel calls:
+
+```typescript
+const address = "0xabc...";
+const timeframe = "30d";
+
+const [pnlRes, candlesRes, marketPnlRes, outcomePnlRes] = await Promise.all([
+	client.trader.getTraderPnl({ address, timeframe }),
+	client.trader.getTraderPnlCandles({ address }),
+	client.trader.getTraderMarketPnl({ address, timeframe, limit: 100 }),
+	client.trader.getTraderOutcomePnl({
+		address,
+		timeframe,
+		limit: 200,
+		sort_by: "buy_usd",
+		sort_direction: "desc",
+	}),
+]);
+```
+
 ## Market Deep Dive
 
 ### Full Market Analysis
@@ -114,10 +136,21 @@ const candles = await client.markets.getCandlestick({
 	interval: "1h",
 });
 
-for (const candle of candles.data.candles) {
-	console.log(`O: ${candle.open} H: ${candle.high} L: ${candle.low} C: ${candle.close}`);
+for (const bar of candles.data) {
+	console.log(`O: ${bar.o} H: ${bar.h} L: ${bar.l} C: ${bar.c}`);
 }
 ```
+
+### Resolution Types
+
+`getCandlestick` and `getEventChart` use different resolution values:
+
+| Endpoint | Valid Resolutions |
+| -------- | ----------------- |
+| `getCandlestick` / `getPositionCandlestick` | `"1"`, `"5"`, `"15"`, `"30"`, `"60"`, `"240"`, `"D"`, `"1D"` |
+| `getEventChart` | `"1H"`, `"6H"`, `"1D"`, `"1W"`, `"1M"`, `"ALL"` |
+
+Both candlestick endpoints also accept `count_back` (number of candles, max 2500) and `from`/`to` (Unix seconds) for time range queries.
 
 ### Position-Level Analysis
 
@@ -129,6 +162,42 @@ const posCandles = await client.markets.getPositionCandlestick({ positionId, int
 const posVolume = await client.markets.getPositionVolumeChart({ positionId });
 const posHolders = await client.holders.getPositionHolders({ positionId });
 ```
+
+### Order Book Data
+
+```typescript
+const marketBook = await client.orderBook.getMarketOrderBook({ condition_id: "0x..." });
+const spread = await client.orderBook.getSpreadHistory({ condition_id: "0x..." });
+```
+
+## Batch Event Enrichment
+
+When enriching positions with event metadata, batch-fetch by slug (max 50 per call):
+
+```typescript
+const slugs = ["us-election-2024", "bitcoin-100k", "fed-rate-cut"];
+
+const batches: string[][] = [];
+for (let i = 0; i < slugs.length; i += 50) {
+	batches.push(slugs.slice(i, i + 50));
+}
+
+const results = await Promise.all(
+	batches.map((batch) =>
+		client.events.getEvents({ event_slugs: batch.join(","), include_metrics: false })
+	)
+);
+
+const eventBySlug = new Map();
+for (const res of results) {
+	if (!res.success) continue;
+	for (const event of res.data) {
+		eventBySlug.set(event.event_slug, event);
+	}
+}
+```
+
+Pass `include_metrics: false` to reduce response size during enrichment.
 
 ## Paginating Large Datasets
 

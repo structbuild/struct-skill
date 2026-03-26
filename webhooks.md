@@ -76,6 +76,8 @@ Payload name mapping:
 | `market_created` | `MarketCreatedPayload` |
 | `asset_price_tick` | `AssetPriceTickPayload` |
 | `asset_price_window_update` | `AssetPriceWindowUpdatePayload` |
+| `price_spike` | `PriceSpikePayload` |
+| `trader_new_trade` | `NewTradePayload` |
 
 ## Creating a Webhook
 
@@ -114,6 +116,7 @@ await client.webhooks.create({
 | `trader_global_pnl` | Global PnL update | `traders`, `min_realized_pnl_usd`, `min_win_rate`, `min_markets_traded` |
 | `trader_market_pnl` | Market-level PnL update | `traders`, `condition_ids`, `min_realized_pnl_usd` |
 | `trader_event_pnl` | Event-level PnL update | `traders`, `event_slugs`, `min_realized_pnl_usd` |
+| `trader_new_trade` | Any new trade by a tracked trader | `wallet_addresses`, `condition_ids`, `event_slugs` |
 
 ### Metrics Events
 
@@ -141,6 +144,7 @@ await client.webhooks.create({
 | `probability_spike` | Dramatic probability change | `condition_ids`, `position_ids`, `min_probability_change_pct`, `timeframes` |
 | `close_to_bond` | Price approaches bond value | `condition_ids`, `min_probability` |
 | `market_created` | New market created | (none) |
+| `price_spike` | Significant price movement in a market | `condition_ids`, `min_price_change_pct`, `timeframes`, `spike_direction`, `window_secs` |
 
 ### Asset Events
 
@@ -224,11 +228,19 @@ await client.webhooks.create({
 | ------ | ---- | ----------- |
 | `asset_symbols` | string[] | BTC, ETH, SOL, XRP |
 
+### Spike Filters
+
+| Filter | Type | Description |
+| ------ | ---- | ----------- |
+| `spike_direction` | string | "up", "down", or "both" |
+| `window_secs` | number | Observation window in seconds for spike detection |
+
 ### Other Filters
 
 | Filter | Type | Description |
 | ------ | ---- | ----------- |
 | `exclude_shorterm_market_timeframes` | boolean | Exclude short-term markets |
+| `exclude_shortterm_markets` | boolean | Exclude short-term/updown markets |
 
 ## Examples
 
@@ -319,6 +331,22 @@ const webhook = await client.webhooks.create({
 
 await client.webhooks.rotateSecret({ webhookId: webhook.data.id });
 ```
+
+## Signature Verification
+
+Verify webhook deliveries using the `x-struct-signature` header:
+
+```typescript
+import { createHmac, timingSafeEqual } from "crypto";
+
+function verifyWebhookSignature(rawBody: string, signature: string, secret: string): boolean {
+	const expected = createHmac("sha256", secret).update(rawBody).digest("hex");
+	const sig = signature.startsWith("sha256=") ? signature.slice(7) : signature;
+	return timingSafeEqual(Buffer.from(sig, "hex"), Buffer.from(expected, "hex"));
+}
+```
+
+The signature is sent in the `x-struct-signature` header (fallback: `x-webhook-signature`). It may include a `sha256=` prefix.
 
 ## Managing Webhooks
 

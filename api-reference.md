@@ -16,6 +16,8 @@ interface HttpResponse<T> {
 interface ApiResponseInfo {
 	version: string;
 	credits_consumed: number;
+	time_taken_ms?: number;
+	compute_time_ms?: number;
 }
 
 interface PaginationInfo {
@@ -122,6 +124,9 @@ client.trader.getTraderPnlCandles({ address, resolution?, start_ts?, end_ts?, li
 // resolution: "1h" | "4h" | "1d" | "1w"
 // returns: HttpResponse<PnlCandlesResponse>
 
+client.trader.getTraderPnlCalendar({ address, ...query }, venue?)
+// returns: HttpResponse<PnlCalendarResponse>
+
 client.trader.getGlobalPnl(params?, venue?)
 // returns: HttpResponse<GlobalPnlTrader[]>
 ```
@@ -176,6 +181,25 @@ client.bonds.getBonds(params?, venue?)
 // returns: HttpResponse<BondMarket[]>
 ```
 
+## OrderBook Namespace
+
+```typescript
+client.orderBook.getOrderBook({ position_id, ...query }, venue?)
+// returns: HttpResponse<unknown>
+
+client.orderBook.getOrderBookHistory(params?, venue?)
+// params: { position_id?, condition_id?, market_slug?, limit?, pagination_key? }
+// returns: HttpResponse<unknown>
+
+client.orderBook.getMarketOrderBook(params?, venue?)
+// params: { condition_id?, market_slug? }
+// returns: HttpResponse<unknown>
+
+client.orderBook.getSpreadHistory(params?, venue?)
+// params: { position_id?, condition_id?, market_slug?, limit?, pagination_key? }
+// returns: HttpResponse<unknown>
+```
+
 ## Assets Namespace
 
 ```typescript
@@ -191,7 +215,7 @@ Platform-level (not venue-scoped):
 client.webhooks.list(params?)
 // returns: HttpResponse<WebhookListResponseBody>
 
-client.webhooks.create({ url, events, ...body })
+client.webhooks.create({ url, event, ...body })
 // returns: HttpResponse<WebhookResponse>
 
 client.webhooks.getWebhook({ webhookId })
@@ -222,13 +246,27 @@ const markets = await client.markets.getMarkets();
 const polymarketMarkets = await client.markets.getMarkets({}, "polymarket");
 ```
 
+## StructWebSocket
+
+```typescript
+import { StructWebSocket } from "@structbuild/sdk";
+
+const ws = new StructWebSocket({
+	apiKey: "your-api-key",
+});
+```
+
+Real-time WebSocket feeds for market trades, whale trades, smart money signals, and wallet tracking.
+
 ## Error Classes
 
 ```typescript
 import {
-	StructError, // Base error
-	HttpError, // HTTP 4xx/5xx — has .status, .statusText, .body, .responseHeaders
-	NetworkError, // Connection failed
-	TimeoutError, // Request timeout — has .timeout
+	StructError,
+	HttpError,
+	NetworkError,
+	TimeoutError,
+	WebSocketError,
+	WebSocketClosedError,
 } from "@structbuild/sdk";
 ```

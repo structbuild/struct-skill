@@ -52,14 +52,18 @@ const client = new StructClient({
 All methods return `HttpResponse<T>`:
 
 ```typescript
+interface ApiResponseInfo {
+	version: string;
+	credits_consumed: number;
+	time_taken_ms?: number;
+	compute_time_ms?: number;
+}
+
 interface HttpResponse<T> {
 	data: T;
 	message: string | null;
 	success: boolean;
-	info?: {
-		version: string;
-		credits_consumed: number;
-	};
+	info?: ApiResponseInfo;
 	pagination?: {
 		has_more: boolean;
 		pagination_key: string | number | null;
@@ -69,20 +73,21 @@ interface HttpResponse<T> {
 
 ## API Namespaces
 
-The client exposes 10 namespaces. Every method accepts an optional `venue` parameter as its last argument.
+The client exposes 11 namespaces. Every method accepts an optional `venue` parameter as its last argument.
 
-| Namespace  | Purpose                                                           |
-| ---------- | ----------------------------------------------------------------- |
-| `markets`  | Market data, trades, candlesticks, metrics, volume charts         |
-| `events`   | Event listings, charts, metrics, outcomes                         |
-| `trader`   | PnL, profiles, trade history, volume charts                       |
-| `holders`  | Market/position holders and holder history                        |
-| `series`   | Market series listings and outcomes                               |
-| `search`   | Search markets and events                                         |
-| `tags`     | Tag listings and lookup                                           |
-| `bonds`    | Bond market data                                                  |
-| `assets`   | Asset price history                                               |
-| `webhooks` | Webhook management (create, update, delete, test)                 |
+| Namespace   | Purpose                                                          |
+| ----------- | ---------------------------------------------------------------- |
+| `markets`   | Market data, trades, candlesticks, metrics, volume charts        |
+| `events`    | Event listings, charts, metrics, outcomes                        |
+| `trader`    | PnL, profiles, trade history, volume charts                      |
+| `holders`   | Market/position holders and holder history                       |
+| `series`    | Market series listings and outcomes                              |
+| `search`    | Search markets and events                                        |
+| `tags`      | Tag listings and lookup                                          |
+| `bonds`     | Bond market data                                                 |
+| `assets`    | Asset price history                                              |
+| `orderBook` | Order book snapshots, spread history, liquidity depth            |
+| `webhooks`  | Webhook management (create, update, delete, test)                |
 
 ## Markets
 
@@ -133,6 +138,7 @@ const pnlCandles = await client.trader.getTraderPnlCandles({
 	resolution: "1d",
 	limit: 30,
 });
+const calendar = await client.trader.getTraderPnlCalendar({ address: "0x..." });
 
 const volumeChart = await client.trader.getTraderVolumeChart({ address: "0x..." });
 const globalPnl = await client.trader.getGlobalPnl({ limit: 100 });
@@ -180,13 +186,22 @@ const bonds = await client.bonds.getBonds({ limit: 50 });
 const history = await client.assets.getAssetHistory({ asset: "BTC", interval: "1d" });
 ```
 
+## OrderBook
+
+```typescript
+const book = await client.orderBook.getOrderBook({ position_id: "pos_123" });
+const marketBook = await client.orderBook.getMarketOrderBook({ condition_id: "0x..." });
+const history = await client.orderBook.getOrderBookHistory({ condition_id: "0x..." });
+const spread = await client.orderBook.getSpreadHistory({ condition_id: "0x..." });
+```
+
 ## Webhooks
 
 ```typescript
 const webhooks = await client.webhooks.list();
 const webhook = await client.webhooks.create({
 	url: "https://example.com/webhook",
-	events: ["market_trade"],
+	event: "trader_whale_trade",
 });
 const detail = await client.webhooks.getWebhook({ webhookId: "wh_123" });
 await client.webhooks.update({ webhookId: "wh_123", url: "https://example.com/new" });
@@ -208,6 +223,14 @@ for await (const market of paginate((params) => client.markets.getMarkets(params
 }
 ```
 
+## StructWebSocket
+
+```typescript
+import { StructClient, StructWebSocket } from "@structbuild/sdk";
+
+const ws = new StructWebSocket({ apiKey: process.env.STRUCT_API_KEY! });
+```
+
 ## Error Handling
 
 ```typescript
@@ -225,6 +248,18 @@ try {
 	}
 }
 ```
+
+## Tips
+
+- **Parameter naming**: Path parameters use camelCase (`conditionId`, `positionId`, `webhookId`). Query parameters use snake_case (`condition_id`, `sort_by`, `pagination_key`).
+- **Webhook model**: Each webhook subscribes to exactly one `event` type. Use filter arrays (`condition_ids`, `wallet_addresses`) to scope within that event.
+- **Candlestick format**: `getCandlestick` returns a flat `PredictionCandlestickBar[]` array (access via `response.data`), not a wrapped object.
+- **Resolution types differ**: `getCandlestick` uses `"1" | "5" | "15" | "60" | "1D"`. `getEventChart` uses `"1H" | "6H" | "1D" | "1W" | "1M" | "ALL"`. They are not interchangeable.
+- **Batch event lookup**: Use `client.events.getEvents({ event_slugs: "slug1,slug2" })` to fetch multiple events in one call (max 50). Pass `include_metrics: false` for lighter responses during enrichment.
+- **Event type alias**: Import `Event` as `PolymarketEvent` to avoid collision with the DOM `Event` type.
+- **Pagination key types vary**: Events use string keys, bonds/leaderboard use numeric keys.
+- **Portfolio composition**: There is no single portfolio endpoint. Compose from parallel calls to `getTraderPnl`, `getTraderPnlCandles`, `getTraderMarketPnl`, and `getTraderOutcomePnl`.
+- **Webhook signature**: Verify deliveries using the `x-struct-signature` header with HMAC-SHA256 against the raw request body and your configured secret.
 
 ## Additional Resources
 
