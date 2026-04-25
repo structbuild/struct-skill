@@ -57,8 +57,10 @@ Payload name mapping:
 | Event | Schema Name |
 | ----- | ----------- |
 | `trader_first_trade` | `FirstTradePayload` |
-| `trader_new_market` | `FirstTradePayload` |
+| `trader_new_market` | `NewMarketPayload` |
 | `trader_whale_trade` | `WhaleTradePayload` |
+| `trader_new_trade` | `NewTradePayload` |
+| `trader_trade_event` | `WebhookTraderTradeEventPayload` |
 | `trader_global_pnl` | `GlobalPnlPayload` |
 | `trader_market_pnl` | `MarketPnlPayload` |
 | `trader_event_pnl` | `EventPnlPayload` |
@@ -74,10 +76,10 @@ Payload name mapping:
 | `probability_spike` | `ProbabilitySpikePayload` |
 | `close_to_bond` | `CloseToBondPayload` |
 | `market_created` | `MarketCreatedPayload` |
+| `oracle_events` | `OracleEventsPayload` |
 | `asset_price_tick` | `AssetPriceTickPayload` |
 | `asset_price_window_update` | `AssetPriceWindowUpdatePayload` |
 | `price_spike` | `PriceSpikePayload` |
-| `trader_new_trade` | `NewTradePayload` |
 
 ## Creating a Webhook
 
@@ -110,13 +112,14 @@ await client.webhooks.create({
 
 | Event | Description | Key Filters |
 | ----- | ----------- | ----------- |
-| `trader_first_trade` | Trader makes their first trade | `wallet_addresses`, `condition_ids`, `event_slugs` |
-| `trader_new_market` | Trader enters a new market | `wallet_addresses`, `condition_ids`, `event_slugs` |
-| `trader_whale_trade` | Large trade by a tracked trader | `wallet_addresses`, `min_usd_value`, `condition_ids` |
-| `trader_global_pnl` | Global PnL update | `traders`, `min_realized_pnl_usd`, `min_win_rate`, `min_markets_traded` |
-| `trader_market_pnl` | Market-level PnL update | `traders`, `condition_ids`, `min_realized_pnl_usd` |
-| `trader_event_pnl` | Event-level PnL update | `traders`, `event_slugs`, `min_realized_pnl_usd` |
-| `trader_new_trade` | Any new trade by a tracked trader | `wallet_addresses`, `condition_ids`, `event_slugs` |
+| `trader_first_trade` | Trader makes their first trade | `wallet_addresses`, `condition_ids`, `event_slugs`, `tags`, `min_usd_value`, `min_probability`, `max_probability` |
+| `trader_new_market` | Trader enters a new market | `wallet_addresses`, `condition_ids`, `event_slugs`, `min_usd_value`, `min_probability`, `max_probability` |
+| `trader_whale_trade` | Large trade by a tracked trader | `min_usd_value` (required), `condition_ids`, `event_slugs`, `min_probability`, `max_probability` |
+| `trader_new_trade` | New on-chain fill by a tracked trader | `wallet_addresses`, `condition_ids`, `event_slugs`, `min_usd_value` |
+| `trader_trade_event` | Any tagged-union trade event (fills + merges + splits + redemptions + conversions + …) | `wallet_addresses`, `min_usd_value`, `min_probability`, `max_probability`, `condition_ids`, `event_slugs`, `trade_types`, `exclude_shortterm_markets` |
+| `trader_global_pnl` | Global PnL update | `traders`, `min_realized_pnl_usd`, `min_volume_usd`, `min_win_rate`, `min_markets_traded` |
+| `trader_market_pnl` | Market-level PnL update | `traders`, `condition_ids`, `event_slugs`, `min_realized_pnl_usd`, `min_buy_usd` |
+| `trader_event_pnl` | Event-level PnL update | `traders`, `event_slugs`, `min_realized_pnl_usd`, `min_volume_usd`, `min_markets_traded` |
 
 ### Metrics Events
 
@@ -141,10 +144,11 @@ await client.webhooks.create({
 
 | Event | Description | Key Filters |
 | ----- | ----------- | ----------- |
-| `probability_spike` | Dramatic probability change | `condition_ids`, `position_ids`, `min_probability_change_pct`, `timeframes` |
-| `close_to_bond` | Price approaches bond value | `condition_ids`, `min_probability` |
-| `market_created` | New market created | (none) |
+| `probability_spike` | Dramatic probability change | `condition_ids`, `event_slugs`, `outcomes`, `min_probability_change_pct`, `spike_direction`, `window_secs`, `exclude_shortterm_markets` |
+| `close_to_bond` | Price approaches bond value | `min_probability`, `max_probability`, `condition_ids`, `position_ids`, `outcomes`, `event_slugs`, `exclude_shortterm_markets` |
+| `market_created` | New market created | `event_slugs`, `tags`, `exclude_shortterm_markets` |
 | `price_spike` | Significant price movement in a market | `condition_ids`, `min_price_change_pct`, `timeframes`, `spike_direction`, `window_secs` |
+| `oracle_events` | UMA oracle lifecycle events (proposals, disputes, settlements, resolutions) | `condition_ids`, `event_slugs`, `event_types` |
 
 ### Asset Events
 
@@ -171,6 +175,9 @@ await client.webhooks.create({
 | `position_ids` | string[] | Filter by position IDs |
 | `outcomes` | string[] | Filter by outcome name (e.g., "Yes", "No") |
 | `position_outcome_indices` | number[] | Filter by outcome index (0=Yes, 1=No) |
+| `tags` | string[] | Filter by tag slug (used by `trader_first_trade`, `market_created`) |
+| `trade_types` | string[] | Restrict `trader_trade_event` / `trader_new_trade` to specific types (e.g., `OrderFilled`, `Merge`, `Split`, `Redemption`, `PositionsConverted`). Max 500 entries. |
+| `event_types` | string[] | Restrict `oracle_events` to specific UMA event types |
 
 ### Value Filters
 
@@ -318,6 +325,37 @@ await client.webhooks.create({
 });
 ```
 
+### Tagged-Union Trade Stream (replaces `trader_new_trade` for non-fills)
+
+`trader_new_trade` only fires on fills. `trader_trade_event` delivers the full discriminated-union — fills, merges, splits, redemptions, position conversions, cancellations — using the same shape returned by `getTrades`. Pick the `trade_types` you care about:
+
+```typescript
+await client.webhooks.create({
+	url: "https://your-app.com/webhooks/trader-events",
+	event: "trader_trade_event",
+	filters: {
+		wallet_addresses: ["0xabc..."],
+		trade_types: ["OrderFilled", "Redemption", "Merge", "Split"],
+		min_usd_value: 100,
+	},
+});
+```
+
+Note: `event_slugs` and `exclude_shortterm_markets` filters require `trade_types` that exclude `PositionsConverted` (conversion events do not carry an event slug in the typed payload).
+
+### Oracle Lifecycle Events
+
+```typescript
+await client.webhooks.create({
+	url: "https://your-app.com/webhooks/oracle",
+	event: "oracle_events",
+	filters: {
+		condition_ids: ["0xabc..."],
+		event_types: ["Proposal", "Dispute", "Settled", "ConditionResolution"],
+	},
+});
+```
+
 ## Security
 
 Use HMAC secrets to verify webhook payloads:
@@ -347,6 +385,10 @@ function verifyWebhookSignature(rawBody: string, signature: string, secret: stri
 ```
 
 The signature is sent in the `x-struct-signature` header (fallback: `x-webhook-signature`). It may include a `sha256=` prefix.
+
+## Pricing
+
+Webhook deliveries are billed in millicredits (1000 millicredits = 1 credit). Most events cost 100 millicredits (0.1 credits) per delivery. Call `client.webhooks.listEvents()` to read the exact per-event cost and applicable filter fields at runtime — values can change, so don't hardcode them.
 
 ## Managing Webhooks
 

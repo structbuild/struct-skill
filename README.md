@@ -12,8 +12,10 @@ npx skills add structbuild/struct-skill
 
 This skill helps AI agents integrate the Struct SDK into your projects:
 
-- **REST API integration** - Markets, events, traders, holders, series, search, tags, bonds, assets
+- **REST API integration** - Markets, events, traders, holders, series, search, tags, bonds, assets, analytics
+- **Real-time WebSockets** - Room-based streams and event-based alerts
 - **Webhook management** - Create and manage webhooks for event notifications
+- **JWT auth** - Frontend-safe `pk_jwt_*` keys for browser clients
 - **Pagination helpers** - Iterate through large datasets
 - **Error handling** - Typed errors for robust applications
 - **TypeScript types** - Full type safety from OpenAPI spec
@@ -22,10 +24,11 @@ This skill helps AI agents integrate the Struct SDK into your projects:
 
 | File               | Description                                          |
 | ------------------ | ---------------------------------------------------- |
-| `SKILL.md`         | Main skill file with quick start and common patterns  |
-| `api-reference.md` | Complete method reference for all namespaces           |
-| `webhooks.md`      | Webhook events, filters, payload format, and examples |
-| `guides.md`        | Market screening, trader analytics, and more          |
+| `SKILL.md`         | Main skill file with quick start and common patterns |
+| `api-reference.md` | Complete method reference for all namespaces         |
+| `websockets.md`    | Real-time rooms, alerts, payload types, patterns     |
+| `webhooks.md`      | Webhook events, filters, payload format, examples    |
+| `guides.md`        | Recipes: screening, analytics, real-time, JWT, more  |
 
 ## When the Agent Uses This Skill
 
